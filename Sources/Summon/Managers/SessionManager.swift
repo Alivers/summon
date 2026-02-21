@@ -27,7 +27,11 @@ class SessionManager: ObservableObject {
         if let session = sessions[slotID] {
             session.toggleVisibility()
         } else {
-            let session = TerminalSession(config: slot)
+            // Resolve working directory before creating the session —
+            // must happen while the previous app is still frontmost.
+            var launchConfig = slot
+            launchConfig.workingDirectory = WorkingDirectoryDetector.resolve(for: slot)
+            let session = TerminalSession(config: launchConfig)
             sessions[slotID] = session
             session.launch()
         }
@@ -79,17 +83,19 @@ extension [SlotConfig] {
         SlotConfig(
             name: "Claude Code",
             command: "claude",
+            useProjectDirectory: true,                              // auto-detect project dir
             hotKey: HotKeyConfig(keyCode: 8, modifierFlags: 768)   // ⌘⇧C
         ),
         SlotConfig(
             name: "lazygit",
             command: "lazygit",
-            hotKey: HotKeyConfig(keyCode: 5, modifierFlags: 768)    // ⌘⇧G
+            useProjectDirectory: true,                              // auto-detect project dir
+            hotKey: HotKeyConfig(keyCode: 5, modifierFlags: 768)   // ⌘⇧G
         ),
         SlotConfig(
             name: "k9s",
             command: "k9s",
-            hotKey: HotKeyConfig(keyCode: 40, modifierFlags: 768)   // ⌘⇧K
+            hotKey: HotKeyConfig(keyCode: 40, modifierFlags: 768)  // ⌘⇧K
         ),
     ]
 }

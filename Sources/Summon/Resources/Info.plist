@@ -21,5 +21,7 @@
     <string>Copyright © 2026 Summon contributors</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Summon reads the frontmost window's path to automatically set the working directory when launching your terminal tools.</string>
 </dict>
 </plist>

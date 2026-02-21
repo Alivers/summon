@@ -6,7 +6,10 @@ struct SlotConfig: Identifiable, Codable, Hashable {
     var id: UUID
     var name: String
     var command: String
+    /// Fixed working directory used when `useProjectDirectory` is false.
     var workingDirectory: String
+    /// When true, detect the working directory from the frontmost app at launch time.
+    var useProjectDirectory: Bool
     var hotKey: HotKeyConfig
     var windowSize: WindowSize
 
@@ -15,6 +18,7 @@ struct SlotConfig: Identifiable, Codable, Hashable {
         name: String,
         command: String,
         workingDirectory: String = NSHomeDirectory(),
+        useProjectDirectory: Bool = false,
         hotKey: HotKeyConfig,
         windowSize: WindowSize = .default
     ) {
@@ -22,8 +26,22 @@ struct SlotConfig: Identifiable, Codable, Hashable {
         self.name = name
         self.command = command
         self.workingDirectory = workingDirectory
+        self.useProjectDirectory = useProjectDirectory
         self.hotKey = hotKey
         self.windowSize = windowSize
+    }
+
+    // Custom decoder so existing slots.json files (which lack `useProjectDirectory`)
+    // continue to load correctly — missing key defaults to false.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id                  = try c.decode(UUID.self,         forKey: .id)
+        name                = try c.decode(String.self,       forKey: .name)
+        command             = try c.decode(String.self,       forKey: .command)
+        workingDirectory    = try c.decode(String.self,       forKey: .workingDirectory)
+        useProjectDirectory = try c.decodeIfPresent(Bool.self, forKey: .useProjectDirectory) ?? false
+        hotKey              = try c.decode(HotKeyConfig.self,  forKey: .hotKey)
+        windowSize          = try c.decode(WindowSize.self,    forKey: .windowSize)
     }
 }
 

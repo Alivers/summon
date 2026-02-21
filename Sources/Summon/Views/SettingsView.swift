@@ -95,7 +95,10 @@ private struct SlotDetail: View {
                 TextField("Name", text: $draft.name)
                 TextField("Command", text: $draft.command)
                     .font(.system(.body, design: .monospaced))
-                DirectoryPickerField(path: $draft.workingDirectory)
+                Toggle("Auto-detect working directory", isOn: $draft.useProjectDirectory)
+                if !draft.useProjectDirectory {
+                    DirectoryPickerField(path: $draft.workingDirectory)
+                }
             }
             Section("Hotkey") {
                 HStack {
@@ -141,6 +144,7 @@ private struct AddSlotSheet: View {
     @State private var name = ""
     @State private var command = ""
     @State private var workingDirectory = NSHomeDirectory()
+    @State private var useProjectDirectory = true
 
     var body: some View {
         NavigationStack {
@@ -148,7 +152,10 @@ private struct AddSlotSheet: View {
                 TextField("Name", text: $name)
                 TextField("Command", text: $command)
                     .font(.system(.body, design: .monospaced))
-                DirectoryPickerField(path: $workingDirectory)
+                Toggle("Auto-detect working directory", isOn: $useProjectDirectory)
+                if !useProjectDirectory {
+                    DirectoryPickerField(path: $workingDirectory)
+                }
             }
             .formStyle(.grouped)
             .navigationTitle("New Slot")
@@ -162,6 +169,7 @@ private struct AddSlotSheet: View {
                             name: name,
                             command: command,
                             workingDirectory: workingDirectory,
+                            useProjectDirectory: useProjectDirectory,
                             hotKey: HotKeyConfig(keyCode: 0, modifierFlags: 0)
                         ))
                         isPresented = false
