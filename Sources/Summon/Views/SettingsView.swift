@@ -95,8 +95,7 @@ private struct SlotDetail: View {
                 TextField("Name", text: $draft.name)
                 TextField("Command", text: $draft.command)
                     .font(.system(.body, design: .monospaced))
-                TextField("Working directory", text: $draft.workingDirectory)
-                    .font(.system(.body, design: .monospaced))
+                DirectoryPickerField(path: $draft.workingDirectory)
             }
             Section("Hotkey") {
                 HStack {
@@ -149,8 +148,7 @@ private struct AddSlotSheet: View {
                 TextField("Name", text: $name)
                 TextField("Command", text: $command)
                     .font(.system(.body, design: .monospaced))
-                TextField("Working directory", text: $workingDirectory)
-                    .font(.system(.body, design: .monospaced))
+                DirectoryPickerField(path: $workingDirectory)
             }
             .formStyle(.grouped)
             .navigationTitle("New Slot")
@@ -173,5 +171,43 @@ private struct AddSlotSheet: View {
             }
         }
         .frame(minWidth: 420, minHeight: 240)
+    }
+}
+
+// MARK: - Directory picker field
+
+/// A monospaced text field with a folder button that opens NSOpenPanel.
+private struct DirectoryPickerField: View {
+    @Binding var path: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TextField("", text: $path)
+                .font(.system(.body, design: .monospaced))
+            Button {
+                pickDirectory()
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.borderless)
+            .help("Choose directory…")
+        }
+    }
+
+    private func pickDirectory() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Working Directory"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Select"
+        // Open at the currently configured path if it exists
+        panel.directoryURL = URL(fileURLWithPath:
+            (path as NSString).expandingTildeInPath
+        )
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Abbreviate path back to ~ where possible
+        path = (url.path as NSString).abbreviatingWithTildeInPath
     }
 }
