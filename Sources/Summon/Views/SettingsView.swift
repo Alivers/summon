@@ -98,6 +98,13 @@ private struct SlotDetail: View {
                 TextField("Working directory", text: $draft.workingDirectory)
                     .font(.system(.body, design: .monospaced))
             }
+            Section("Hotkey") {
+                HStack {
+                    Text("Shortcut")
+                    Spacer()
+                    HotKeyRecorderView(hotKey: $draft.hotKey)
+                }
+            }
             Section("Window") {
                 HStack {
                     Text("Width")
@@ -114,7 +121,6 @@ private struct SlotDetail: View {
                         .multilineTextAlignment(.trailing)
                 }
             }
-            // TODO: hotkey recorder component
         }
         .formStyle(.grouped)
         .toolbar {

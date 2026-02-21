@@ -15,10 +15,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
         hotKeyManager = HotKeyManager(sessionManager: sessionManager, initialSlots: sessionManager.slots)
 
-        // Keep menu in sync whenever slots are added, removed, or renamed
+        // Keep menu and hotkeys in sync whenever slots change
         slotsCancellable = sessionManager.$slots
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.rebuildMenu() }
+            .sink { [weak self] slots in
+                self?.rebuildMenu()
+                self?.hotKeyManager?.registerAll(slots: slots)
+            }
     }
 
     // MARK: - Menu bar
