@@ -1,0 +1,167 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @EnvironmentObject var sessionManager: SessionManager
+    @State private var selectedSlotID: UUID?
+    @State private var isAddingSlot = false
+
+    var body: some View {
+        NavigationSplitView {
+            List(sessionManager.slots, selection: $selectedSlotID) { slot in
+                SlotRow(slot: slot)
+                    .tag(slot.id)
+            }
+            .navigationTitle("Slots")
+            .toolbar {
+                ToolbarItem {
+                    Button { isAddingSlot = true } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                }
+                ToolbarItem {
+                    Button {
+                        if let id = selectedSlotID {
+                            sessionManager.remove(at: IndexSet(
+                                [sessionManager.slots.firstIndex { $0.id == id }].compactMap { $0 }
+                            ))
+                            selectedSlotID = nil
+                        }
+                    } label: {
+                        Label("Remove", systemImage: "minus")
+                    }
+                    .disabled(selectedSlotID == nil)
+                }
+            }
+        } detail: {
+            if let id = selectedSlotID,
+               let slot = sessionManager.slots.first(where: { $0.id == id }) {
+                SlotDetail(slot: slot)
+                    .environmentObject(sessionManager)
+            } else {
+                ContentUnavailableView(
+                    "No Slot Selected",
+                    systemImage: "terminal",
+                    description: Text("Select a slot or press + to add one.")
+                )
+            }
+        }
+        .frame(minWidth: 560, minHeight: 340)
+        .sheet(isPresented: $isAddingSlot) {
+            AddSlotSheet(isPresented: $isAddingSlot)
+                .environmentObject(sessionManager)
+        }
+    }
+}
+
+// MARK: - Slot row
+
+private struct SlotRow: View {
+    let slot: SlotConfig
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(slot.name).font(.headline)
+                Text(slot.command).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(slot.hotKey.displayString)
+                .font(.caption.monospaced())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Slot detail
+
+private struct SlotDetail: View {
+    @EnvironmentObject var sessionManager: SessionManager
+    @State var draft: SlotConfig
+
+    init(slot: SlotConfig) {
+        _draft = State(initialValue: slot)
+    }
+
+    var body: some View {
+        Form {
+            Section("App") {
+                TextField("Name", text: $draft.name)
+                TextField("Command", text: $draft.command)
+                    .font(.system(.body, design: .monospaced))
+                TextField("Working directory", text: $draft.workingDirectory)
+                    .font(.system(.body, design: .monospaced))
+            }
+            Section("Window") {
+                HStack {
+                    Text("Width")
+                    Spacer()
+                    TextField("", value: $draft.windowSize.width, format: .number)
+                        .frame(width: 70)
+                        .multilineTextAlignment(.trailing)
+                }
+                HStack {
+                    Text("Height")
+                    Spacer()
+                    TextField("", value: $draft.windowSize.height, format: .number)
+                        .frame(width: 70)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+            // TODO: hotkey recorder component
+        }
+        .formStyle(.grouped)
+        .toolbar {
+            ToolbarItem {
+                Button("Save") { sessionManager.update(slot: draft) }
+                    .keyboardShortcut("s")
+            }
+        }
+        .navigationTitle(draft.name)
+    }
+}
+
+// MARK: - Add sheet
+
+private struct AddSlotSheet: View {
+    @EnvironmentObject var sessionManager: SessionManager
+    @Binding var isPresented: Bool
+
+    @State private var name = ""
+    @State private var command = ""
+    @State private var workingDirectory = NSHomeDirectory()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Name", text: $name)
+                TextField("Command", text: $command)
+                    .font(.system(.body, design: .monospaced))
+                TextField("Working directory", text: $workingDirectory)
+                    .font(.system(.body, design: .monospaced))
+            }
+            .formStyle(.grouped)
+            .navigationTitle("New Slot")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        sessionManager.add(slot: SlotConfig(
+                            name: name,
+                            command: command,
+                            workingDirectory: workingDirectory,
+                            hotKey: HotKeyConfig(keyCode: 0, modifierFlags: 0)
+                        ))
+                        isPresented = false
+                    }
+                    .disabled(name.isEmpty || command.isEmpty)
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 240)
+    }
+}

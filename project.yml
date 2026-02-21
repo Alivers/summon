@@ -1,0 +1,50 @@
+name: Summon
+options:
+  bundleIdPrefix: app.summon
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.4"
+
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    from: "1.2.5"
+  HotKey:
+    url: https://github.com/soffes/HotKey
+    from: "0.2.0"
+
+targets:
+  Summon:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Summon
+        excludes:
+          - Resources/Assets.xcassets
+    resources:
+      - path: Sources/Summon/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.summon
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: Sources/Summon/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/Summon/Resources/Summon.entitlements
+        SWIFT_VERSION: "5.9"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: SwiftTerm
+      - package: HotKey
+
+schemes:
+  Summon:
+    build:
+      targets:
+        Summon: all
+    run:
+      config: Debug
+      environmentVariables:
+        OS_ACTIVITY_MODE: disable
+    archive:
+      config: Release
