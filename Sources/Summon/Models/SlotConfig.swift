@@ -1,4 +1,5 @@
 import Foundation
+import Carbon.HIToolbox
 
 /// A configured "slot" — one terminal app with its hotkey and launch settings.
 struct SlotConfig: Identifiable, Codable, Hashable {

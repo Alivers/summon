@@ -36,10 +36,10 @@ class HotKeyManager {
     private var hotKeyRefs: [UUID: EventHotKeyRef] = [:]
     private var nextCarbonID: UInt32 = 1
 
-    init(sessionManager: SessionManager) {
+    init(sessionManager: SessionManager, initialSlots: [SlotConfig]) {
         _sessionManager = sessionManager
         installEventHandler()
-        registerAll(slots: sessionManager.slots)
+        registerAll(slots: initialSlots)
     }
 
     deinit {

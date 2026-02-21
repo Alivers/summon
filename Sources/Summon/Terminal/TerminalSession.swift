@@ -11,6 +11,10 @@ class TerminalSession {
 
     func launch() {
         let wc = TerminalWindowController(config: config)
+        // When the process exits, drop our reference so the next hotkey re-launches fresh
+        wc.onProcessTerminated = { [weak self] in
+            self?.windowController = nil
+        }
         windowController = wc
         wc.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)

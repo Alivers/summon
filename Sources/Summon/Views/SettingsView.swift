@@ -38,11 +38,15 @@ struct SettingsView: View {
                 SlotDetail(slot: slot)
                     .environmentObject(sessionManager)
             } else {
-                ContentUnavailableView(
-                    "No Slot Selected",
-                    systemImage: "terminal",
-                    description: Text("Select a slot or press + to add one.")
-                )
+                VStack(spacing: 8) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text("No Slot Selected").font(.headline)
+                    Text("Select a slot or press + to add one.")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(minWidth: 560, minHeight: 340)

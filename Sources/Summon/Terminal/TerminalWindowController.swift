@@ -1,10 +1,13 @@
 import AppKit
+import SwiftTerm
 
-// TODO: import SwiftTerm — replace placeholder view with LocalProcessTerminalView
-
-/// Controls the floating window that hosts a terminal session.
+/// Controls the floating window that hosts a single terminal app session.
 class TerminalWindowController: NSWindowController {
     private let config: SlotConfig
+    private var terminalView: LocalProcessTerminalView?
+
+    /// Called when the hosted process exits (e.g. user quits lazygit).
+    var onProcessTerminated: (() -> Void)?
 
     init(config: SlotConfig) {
         self.config = config
@@ -19,34 +22,68 @@ class TerminalWindowController: NSWindowController {
         )
         window.title = config.name
         window.isReleasedWhenClosed = false
+        // Use .normal level — we bring it forward with makeKeyAndOrderFront
+        // when summoned, and it behaves as a regular window otherwise.
+        window.level = .normal
         window.center()
-        // Float above normal windows but below system UI
-        window.level = .floating
 
         super.init(window: window)
-        setupTerminalView()
+        setupTerminal()
     }
 
     required init?(coder: NSCoder) { fatalError("use init(config:)") }
 
-    private func setupTerminalView() {
+    // MARK: - Setup
+
+    private func setupTerminal() {
         guard let contentView = window?.contentView else { return }
 
-        // --- Placeholder: replace this block with SwiftTerm integration ---
-        let textView = NSTextView(frame: contentView.bounds)
-        textView.autoresizingMask = [.width, .height]
-        textView.isEditable = false
-        textView.backgroundColor = NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1)
-        textView.textColor = .green
-        textView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-        textView.string = """
-            [\(config.name)]
-            $ \(config.command)
-            cwd: \(config.workingDirectory)
+        let tv = LocalProcessTerminalView(frame: contentView.bounds)
+        tv.autoresizingMask = [.width, .height]
+        tv.processDelegate = self
+        contentView.addSubview(tv)
+        terminalView = tv
 
-            ⚠️  SwiftTerm integration pending — this is a placeholder view.
-            """
-        contentView.addSubview(textView)
-        // --- End placeholder ---
+        startProcess(in: tv)
+    }
+
+    private func startProcess(in tv: LocalProcessTerminalView) {
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        // Expand ~ so posix_spawn receives an absolute path
+        let dir = (config.workingDirectory as NSString).expandingTildeInPath
+        // Single-quote the path to handle spaces; escape any embedded single quotes
+        let escapedDir = dir.replacingOccurrences(of: "'", with: #"'\''""#)
+
+        // -l  → login shell, loads ~/.zprofile / ~/.bash_profile (sets up PATH, rbenv, etc.)
+        // exec replaces the shell process with the target command (cleaner process tree)
+        tv.startProcess(
+            executable: shell,
+            args: ["-l", "-c", "cd '\(escapedDir)' && exec \(config.command)"],
+            environment: nil,
+            execName: config.command
+        )
+    }
+}
+
+// MARK: - LocalProcessTerminalViewDelegate
+
+extension TerminalWindowController: LocalProcessTerminalViewDelegate {
+    func processTerminated(source: TerminalView, exitCode: Int32?) {
+        DispatchQueue.main.async {
+            self.close()
+            self.onProcessTerminated?()
+        }
+    }
+
+    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {
+        // No-op for now; could update window subtitle with dimensions
+    }
+
+    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        window?.title = title.isEmpty ? config.name : title
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        // Reserved for future project-aware features
     }
 }

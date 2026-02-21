@@ -1,5 +1,7 @@
 import AppKit
 
+// NSApplicationDelegate callbacks always arrive on the main thread.
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     let sessionManager = SessionManager()
     private var statusItem: NSStatusItem?
@@ -9,7 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Run as a background/menu-bar-only app — no Dock icon
         NSApp.setActivationPolicy(.accessory)
         setupMenuBar()
-        hotKeyManager = HotKeyManager(sessionManager: sessionManager)
+        hotKeyManager = HotKeyManager(sessionManager: sessionManager, initialSlots: sessionManager.slots)
     }
 
     private func setupMenuBar() {
