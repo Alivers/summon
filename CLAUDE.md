@@ -8,12 +8,19 @@ macOS menu bar app that lets you launch terminal apps (claude, lazygit, k9s, …
 # Generate Xcode project (required after project.yml changes)
 xcodegen generate
 
-# Build
-xcodebuild -scheme Summon -destination "platform=macOS" -derivedDataPath /tmp/summon-build build
+# Build + install to ~/Applications (stable path = Accessibility permission survives restarts)
+xcodebuild -scheme Summon -destination "platform=macOS" \
+  -derivedDataPath /tmp/summon-build build && \
+  cp -R /tmp/summon-build/Build/Products/Debug/Summon.app ~/Applications/
 
 # Run (kill previous instance first)
-pkill -x Summon; sleep 0.5; open /tmp/summon-build/Build/Products/Debug/Summon.app
+pkill -x Summon 2>/dev/null; sleep 0.5; open ~/Applications/Summon.app
 ```
+
+> **Note on Accessibility permission**: macOS ties the permission to the binary hash.
+> Rebuilding replaces the binary → permission must be re-granted once after each build.
+> Between restarts of the *same* binary the permission persists.
+> Permanent fix: sign with a Developer ID certificate (future milestone).
 
 No Swift Package Manager — dependencies (SwiftTerm, HotKey) are declared in `project.yml` and resolved by Xcode/xcodebuild.
 
