@@ -33,8 +33,7 @@ struct WorkingDirectoryDetector {
 
         switch bundleID {
         case "com.apple.finder":
-            // Finder's AXDocument is the folder URL of the frontmost window
-            return axMainWindowDocument(axApp)?.path
+            return finderFrontWindowPath()
 
         case "com.apple.dt.Xcode":
             // Xcode's AXDocument points to the .xcodeproj/.xcworkspace —
@@ -74,6 +73,22 @@ struct WorkingDirectoryDetector {
               url.isFileURL else { return nil }
 
         return url
+    }
+
+    // MARK: - Finder
+
+    /// Uses AppleScript to get the POSIX path of Finder's frontmost window target folder.
+    private static func finderFrontWindowPath() -> String? {
+        let script = NSAppleScript(source: """
+            tell application "Finder"
+                if (count of Finder windows) > 0 then
+                    return POSIX path of (target of front Finder window as alias)
+                end if
+            end tell
+            """)
+        var error: NSDictionary?
+        let result = script?.executeAndReturnError(&error)
+        return result?.stringValue
     }
 
     // MARK: - Permissions

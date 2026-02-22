@@ -23,5 +23,7 @@
     <string>NSApplication</string>
     <key>NSAccessibilityUsageDescription</key>
     <string>Summon reads the frontmost window's path to automatically set the working directory when launching your terminal tools.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Summon sends Apple Events to Finder to detect the current folder for your terminal tools.</string>
 </dict>
 </plist>
