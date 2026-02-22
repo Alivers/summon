@@ -1,4 +1,5 @@
 import SwiftUI
+import ApplicationServices
 
 struct SettingsView: View {
     @EnvironmentObject var sessionManager: SessionManager
@@ -23,6 +24,10 @@ struct SettingsView: View {
             .padding(.horizontal)
             .padding(.top, 12)
             .padding(.bottom, 8)
+
+            PermissionsSection()
+                .padding(.horizontal)
+                .padding(.bottom, 8)
 
             HStack {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
@@ -297,5 +302,92 @@ private struct DirectoryPickerField: View {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         path = (url.path as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+// MARK: - Permissions section
+
+private struct PermissionsSection: View {
+    @State private var accessibilityGranted = AXIsProcessTrusted()
+    private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Permissions")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            PermissionRowView(
+                granted: accessibilityGranted,
+                name: "Accessibility",
+                description: "Detect working directory from frontmost app window.",
+                settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            )
+
+            PermissionRowView(
+                granted: nil,
+                name: "Automation (Finder)",
+                description: "macOS will prompt when needed.",
+                settingsURL: nil
+            )
+        }
+        .onReceive(timer) { _ in
+            accessibilityGranted = AXIsProcessTrusted()
+        }
+    }
+}
+
+private struct PermissionRowView: View {
+    let granted: Bool?
+    let name: String
+    let description: String
+    let settingsURL: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            statusIcon
+                .font(.body)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.body.weight(.medium))
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let urlString = settingsURL {
+                Button("Open Settings") {
+                    if let url = URL(string: urlString) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(.separator, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch granted {
+        case true:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case false:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.yellow)
+        case nil:
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.secondary)
+        }
     }
 }

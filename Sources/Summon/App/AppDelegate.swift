@@ -24,6 +24,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.rebuildMenu()
                 self?.hotKeyManager?.registerAll(slots: slots)
             }
+
+        // Auto-open settings on first launch so users see permissions upfront
+        if !slotsFileExists {
+            openSettings()
+        }
+    }
+
+    private var slotsFileExists: Bool {
+        let dir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Summon", isDirectory: true)
+        let url = dir.appendingPathComponent("slots.json")
+        return FileManager.default.fileExists(atPath: url.path)
     }
 
     // MARK: - Menu bar
