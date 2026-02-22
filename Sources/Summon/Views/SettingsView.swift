@@ -2,56 +2,28 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var sessionManager: SessionManager
-    @State private var selectedSlotID: UUID?
-    @State private var isAddingSlot = false
+    @State private var expandedSlotID: UUID?
     @State private var launchAtLogin = LaunchAtLoginHelper.isEnabled
 
     var body: some View {
-        NavigationSplitView {
-            List(sessionManager.slots, selection: $selectedSlotID) { slot in
-                SlotRow(slot: slot)
-                    .tag(slot.id)
-            }
-            .navigationTitle("Slots")
-            .toolbar {
-                ToolbarItem {
-                    Button { isAddingSlot = true } label: {
-                        Label("Add", systemImage: "plus")
-                    }
+        VStack(spacing: 0) {
+            // Title bar
+            HStack {
+                Text("Summon Settings")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    addSlot()
+                } label: {
+                    Image(systemName: "plus")
                 }
-                ToolbarItem {
-                    Button {
-                        if let id = selectedSlotID {
-                            sessionManager.remove(at: IndexSet(
-                                [sessionManager.slots.firstIndex { $0.id == id }].compactMap { $0 }
-                            ))
-                            selectedSlotID = nil
-                        }
-                    } label: {
-                        Label("Remove", systemImage: "minus")
-                    }
-                    .disabled(selectedSlotID == nil)
-                }
+                .buttonStyle(.borderless)
+                .help("Add slot")
             }
-        } detail: {
-            if let id = selectedSlotID,
-               let slot = sessionManager.slots.first(where: { $0.id == id }) {
-                SlotDetail(slot: slot)
-                    .environmentObject(sessionManager)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "terminal")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.secondary)
-                    Text("No Slot Selected").font(.headline)
-                    Text("Select a slot or press + to add one.")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(minWidth: 560, minHeight: 340)
-        .safeAreaInset(edge: .bottom) {
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
             HStack {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { newValue in
@@ -60,105 +32,70 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.horizontal)
-            .padding(.vertical, 8)
-        }
-        .sheet(isPresented: $isAddingSlot) {
-            AddSlotSheet(isPresented: $isAddingSlot)
-                .environmentObject(sessionManager)
-        }
-    }
-}
+            .padding(.bottom, 8)
 
-// MARK: - Slot row
+            Divider()
 
-private struct SlotRow: View {
-    let slot: SlotConfig
+            // Slot cards
+            ScrollView {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Slots")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
 
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(slot.name).font(.headline)
-                Text(slot.command).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(slot.hotKey.displayString)
-                .font(.caption.monospaced())
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-// MARK: - Slot detail
-
-private struct SlotDetail: View {
-    @EnvironmentObject var sessionManager: SessionManager
-    @State var draft: SlotConfig
-
-    init(slot: SlotConfig) {
-        _draft = State(initialValue: slot)
-    }
-
-    var body: some View {
-        Form {
-            Section("App") {
-                TextField("Name", text: $draft.name)
-                TextField("Command", text: $draft.command)
-                    .font(.system(.body, design: .monospaced))
-                Toggle("Auto-detect working directory", isOn: $draft.useProjectDirectory)
-                if !draft.useProjectDirectory {
-                    DirectoryPickerField(path: $draft.workingDirectory)
-                }
-            }
-            Section("Hotkey") {
-                HStack {
-                    Text("Shortcut")
-                    Spacer()
-                    HotKeyRecorderView(hotKey: $draft.hotKey)
-                    if draft.hotKey.keyCode != 0 || draft.hotKey.modifierFlags != 0 {
-                        Button {
-                            draft.hotKey = HotKeyConfig(keyCode: 0, modifierFlags: 0)
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Clear shortcut")
+                    ForEach($sessionManager.slots) { $slot in
+                        SlotCardView(
+                            slot: $slot,
+                            isExpanded: expandedSlotID == slot.id,
+                            onToggleExpand: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if expandedSlotID == slot.id {
+                                        expandedSlotID = nil
+                                    } else {
+                                        expandedSlotID = slot.id
+                                    }
+                                }
+                            },
+                            onDelete: {
+                                deleteSlot(id: slot.id)
+                            },
+                            onChanged: {
+                                sessionManager.save()
+                            },
+                            hotkeyConflict: hotkeyConflict(for: slot)
+                        )
                     }
                 }
-                if let conflict = hotkeyConflict(for: draft) {
-                    Text("Conflicts with \"\(conflict)\"")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-            }
-            Section("Window") {
-                HStack {
-                    Text("Width")
-                    Spacer()
-                    TextField("", value: $draft.windowSize.width, format: .number)
-                        .frame(width: 70)
-                        .multilineTextAlignment(.trailing)
-                }
-                HStack {
-                    Text("Height")
-                    Spacer()
-                    TextField("", value: $draft.windowSize.height, format: .number)
-                        .frame(width: 70)
-                        .multilineTextAlignment(.trailing)
-                }
+                .padding()
             }
         }
-        .formStyle(.grouped)
-        .toolbar {
-            ToolbarItem {
-                Button("Save") { sessionManager.update(slot: draft) }
-                    .keyboardShortcut("s")
-            }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .onChange(of: expandedSlotID) { _ in
+            sessionManager.save()
         }
-        .navigationTitle(draft.name)
+    }
+
+    private func addSlot() {
+        let newSlot = SlotConfig(
+            name: "",
+            command: "",
+            hotKey: HotKeyConfig(keyCode: 0, modifierFlags: 0)
+        )
+        sessionManager.slots.append(newSlot)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedSlotID = newSlot.id
+        }
+    }
+
+    private func deleteSlot(id: UUID) {
+        guard let idx = sessionManager.slots.firstIndex(where: { $0.id == id }) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if expandedSlotID == id { expandedSlotID = nil }
+            sessionManager.remove(at: IndexSet(integer: idx))
+        }
     }
 
     private func hotkeyConflict(for slot: SlotConfig) -> String? {
@@ -171,50 +108,159 @@ private struct SlotDetail: View {
     }
 }
 
-// MARK: - Add sheet
+// MARK: - Slot card
 
-private struct AddSlotSheet: View {
-    @EnvironmentObject var sessionManager: SessionManager
-    @Binding var isPresented: Bool
-
-    @State private var name = ""
-    @State private var command = ""
-    @State private var workingDirectory = NSHomeDirectory()
-    @State private var useProjectDirectory = true
+private struct SlotCardView: View {
+    @Binding var slot: SlotConfig
+    let isExpanded: Bool
+    let onToggleExpand: () -> Void
+    let onDelete: () -> Void
+    let onChanged: () -> Void
+    let hotkeyConflict: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $name)
-                TextField("Command", text: $command)
-                    .font(.system(.body, design: .monospaced))
-                Toggle("Auto-detect working directory", isOn: $useProjectDirectory)
-                if !useProjectDirectory {
-                    DirectoryPickerField(path: $workingDirectory)
-                }
-            }
-            .formStyle(.grouped)
-            .navigationTitle("New Slot")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isPresented = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        sessionManager.add(slot: SlotConfig(
-                            name: name,
-                            command: command,
-                            workingDirectory: workingDirectory,
-                            useProjectDirectory: useProjectDirectory,
-                            hotKey: HotKeyConfig(keyCode: 0, modifierFlags: 0)
-                        ))
-                        isPresented = false
+        VStack(spacing: 0) {
+            // Header — always visible
+            Button(action: onToggleExpand) {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(slot.name.isEmpty ? "Untitled" : slot.name)
+                            .font(.headline)
+                            .foregroundStyle(slot.name.isEmpty ? .secondary : .primary)
+                        Text(slot.command.isEmpty ? "no command" : slot.command)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .disabled(name.isEmpty || command.isEmpty)
+
+                    Spacer()
+
+                    if slot.hotKey.keyCode != 0 || slot.hotKey.modifierFlags != 0 {
+                        Text(slot.hotKey.displayString)
+                            .font(.caption.monospaced())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded detail
+            if isExpanded {
+                Divider()
+                    .padding(.horizontal, 12)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    LabeledField("Name") {
+                        TextField("Name", text: $slot.name)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { onChanged() }
+                    }
+
+                    LabeledField("Command") {
+                        TextField("Command", text: $slot.command)
+                            .font(.system(.body, design: .monospaced))
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { onChanged() }
+                    }
+
+                    LabeledField("Shortcut") {
+                        HStack(spacing: 6) {
+                            HotKeyRecorderView(hotKey: $slot.hotKey)
+                                .onChange(of: slot.hotKey) { _ in onChanged() }
+                            if slot.hotKey.keyCode != 0 || slot.hotKey.modifierFlags != 0 {
+                                Button {
+                                    slot.hotKey = HotKeyConfig(keyCode: 0, modifierFlags: 0)
+                                    onChanged()
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Clear shortcut")
+                            }
+                        }
+                    }
+
+                    if let conflict = hotkeyConflict {
+                        Text("Conflicts with \"\(conflict)\"")
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
+
+                    Toggle("Auto-detect working directory", isOn: $slot.useProjectDirectory)
+                        .onChange(of: slot.useProjectDirectory) { _ in onChanged() }
+
+                    if !slot.useProjectDirectory {
+                        DirectoryPickerField(path: $slot.workingDirectory)
+                    }
+
+                    LabeledField("Window") {
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Text("W").foregroundStyle(.secondary)
+                                TextField("", value: $slot.windowSize.width, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 60)
+                                    .multilineTextAlignment(.trailing)
+                                    .onSubmit { onChanged() }
+                            }
+                            HStack(spacing: 4) {
+                                Text("H").foregroundStyle(.secondary)
+                                TextField("", value: $slot.windowSize.height, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 60)
+                                    .multilineTextAlignment(.trailing)
+                                    .onSubmit { onChanged() }
+                            }
+                        }
+                    }
+
+                    HStack {
+                        Spacer()
+                        Button("Delete", role: .destructive) {
+                            onDelete()
+                        }
+                    }
+                }
+                .padding(12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .frame(minWidth: 420, minHeight: 240)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.separator, lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Labeled field helper
+
+private struct LabeledField<Content: View>: View {
+    let label: String
+    let content: Content
+
+    init(_ label: String, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .center) {
+            Text(label)
+                .frame(width: 70, alignment: .trailing)
+                .foregroundStyle(.secondary)
+            content
+        }
     }
 }
 
@@ -245,13 +291,11 @@ private struct DirectoryPickerField: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = "Select"
-        // Open at the currently configured path if it exists
         panel.directoryURL = URL(fileURLWithPath:
             (path as NSString).expandingTildeInPath
         )
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        // Abbreviate path back to ~ where possible
         path = (url.path as NSString).abbreviatingWithTildeInPath
     }
 }

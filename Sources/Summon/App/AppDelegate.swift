@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 // NSApplicationDelegate callbacks always arrive on the main thread.
 @MainActor
@@ -8,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var hotKeyManager: HotKeyManager?
     private var slotsCancellable: AnyCancellable?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -66,7 +68,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            let view = SettingsView()
+                .environmentObject(sessionManager)
+                .frame(width: 480, height: 500)
+            let hostingController = NSHostingController(rootView: view)
+            hostingController.sizingOptions = []
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "Summon Settings"
+            window.styleMask = [.titled, .closable]
+            window.center()
+            window.isReleasedWhenClosed = false
+            settingsWindow = window
+            window.makeKeyAndOrderFront(nil)
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
 }
