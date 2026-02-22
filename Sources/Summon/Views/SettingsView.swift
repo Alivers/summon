@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var sessionManager: SessionManager
     @State private var selectedSlotID: UUID?
     @State private var isAddingSlot = false
+    @State private var launchAtLogin = LaunchAtLoginHelper.isEnabled
 
     var body: some View {
         NavigationSplitView {
@@ -50,6 +51,17 @@ struct SettingsView: View {
             }
         }
         .frame(minWidth: 560, minHeight: 340)
+        .safeAreaInset(edge: .bottom) {
+            HStack {
+                Toggle("Launch at Login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { newValue in
+                        LaunchAtLoginHelper.isEnabled = newValue
+                    }
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
         .sheet(isPresented: $isAddingSlot) {
             AddSlotSheet(isPresented: $isAddingSlot)
                 .environmentObject(sessionManager)
@@ -105,6 +117,21 @@ private struct SlotDetail: View {
                     Text("Shortcut")
                     Spacer()
                     HotKeyRecorderView(hotKey: $draft.hotKey)
+                    if draft.hotKey.keyCode != 0 || draft.hotKey.modifierFlags != 0 {
+                        Button {
+                            draft.hotKey = HotKeyConfig(keyCode: 0, modifierFlags: 0)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Clear shortcut")
+                    }
+                }
+                if let conflict = hotkeyConflict(for: draft) {
+                    Text("Conflicts with \"\(conflict)\"")
+                        .foregroundStyle(.red)
+                        .font(.caption)
                 }
             }
             Section("Window") {
@@ -132,6 +159,15 @@ private struct SlotDetail: View {
             }
         }
         .navigationTitle(draft.name)
+    }
+
+    private func hotkeyConflict(for slot: SlotConfig) -> String? {
+        guard slot.hotKey.keyCode != 0 || slot.hotKey.modifierFlags != 0 else { return nil }
+        return sessionManager.slots.first(where: {
+            $0.id != slot.id
+            && $0.hotKey.keyCode == slot.hotKey.keyCode
+            && $0.hotKey.modifierFlags == slot.hotKey.modifierFlags
+        })?.name
     }
 }
 
