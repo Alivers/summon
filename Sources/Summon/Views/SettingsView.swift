@@ -7,48 +7,54 @@ struct SettingsView: View {
     @State private var launchAtLogin = LaunchAtLoginHelper.isEnabled
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Title bar
-            HStack {
-                Text("Summon Settings")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    addSlot()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.borderless)
-                .help("Add slot")
-            }
-            .padding(.horizontal)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // — Permissions
+                PermissionsSection()
 
-            PermissionsSection()
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                // — General
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionLabel("General", icon: "gearshape")
 
-            HStack {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { newValue in
-                        LaunchAtLoginHelper.isEnabled = newValue
-                    }
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            // Slot cards
-            ScrollView {
-                VStack(spacing: 8) {
                     HStack {
-                        Text("Slots")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Toggle("Launch at Login", isOn: $launchAtLogin)
+                            .onChange(of: launchAtLogin) { newValue in
+                                LaunchAtLoginHelper.isEnabled = newValue
+                            }
                         Spacer()
+                    }
+                    .padding(12)
+                    .settingsCard()
+                }
+
+                // — Slots
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        SectionLabel("Slots", icon: "terminal")
+                        Spacer()
+                        Button { addSlot() } label: {
+                            Image(systemName: "plus")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Add slot")
+                    }
+
+                    if sessionManager.slots.isEmpty {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 6) {
+                                Image(systemName: "terminal")
+                                    .font(.title2)
+                                    .foregroundStyle(.quaternary)
+                                Text("No slots configured")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.vertical, 24)
+                            Spacer()
+                        }
                     }
 
                     ForEach($sessionManager.slots) { $slot in
@@ -56,26 +62,18 @@ struct SettingsView: View {
                             slot: $slot,
                             isExpanded: expandedSlotID == slot.id,
                             onToggleExpand: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    if expandedSlotID == slot.id {
-                                        expandedSlotID = nil
-                                    } else {
-                                        expandedSlotID = slot.id
-                                    }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    expandedSlotID = expandedSlotID == slot.id ? nil : slot.id
                                 }
                             },
-                            onDelete: {
-                                deleteSlot(id: slot.id)
-                            },
-                            onChanged: {
-                                sessionManager.save()
-                            },
+                            onDelete: { deleteSlot(id: slot.id) },
+                            onChanged: { sessionManager.save() },
                             hotkeyConflict: hotkeyConflict(for: slot)
                         )
                     }
                 }
-                .padding()
             }
+            .padding(20)
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onChange(of: expandedSlotID) { _ in
@@ -90,14 +88,14 @@ struct SettingsView: View {
             hotKey: HotKeyConfig(keyCode: 0, modifierFlags: 0)
         )
         sessionManager.slots.append(newSlot)
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             expandedSlotID = newSlot.id
         }
     }
 
     private func deleteSlot(id: UUID) {
         guard let idx = sessionManager.slots.firstIndex(where: { $0.id == id }) else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             if expandedSlotID == id { expandedSlotID = nil }
             sessionManager.remove(at: IndexSet(integer: idx))
         }
@@ -113,6 +111,37 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Section label
+
+private struct SectionLabel: View {
+    let title: String
+    let icon: String
+
+    init(_ title: String, icon: String) {
+        self.title = title
+        self.icon = icon
+    }
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - Card modifier
+
+extension View {
+    fileprivate func settingsCard() -> some View {
+        self
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(.separator.opacity(0.5), lineWidth: 0.5)
+            )
+    }
+}
+
 // MARK: - Slot card
 
 private struct SlotCardView: View {
@@ -122,24 +151,28 @@ private struct SlotCardView: View {
     let onDelete: () -> Void
     let onChanged: () -> Void
     let hotkeyConflict: String?
+    @State private var isHovering = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Header — always visible
             Button(action: onToggleExpand) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.tertiary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 12)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(slot.name.isEmpty ? "Untitled" : slot.name)
-                            .font(.headline)
-                            .foregroundStyle(slot.name.isEmpty ? .secondary : .primary)
-                        Text(slot.command.isEmpty ? "no command" : slot.command)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    Text(slot.name.isEmpty ? "Untitled" : slot.name)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(slot.name.isEmpty ? .tertiary : .primary)
+
+                    if !isExpanded && !slot.command.isEmpty {
+                        Text(slot.command)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
                     }
 
                     Spacer()
@@ -147,9 +180,10 @@ private struct SlotCardView: View {
                     if slot.hotKey.keyCode != 0 || slot.hotKey.modifierFlags != 0 {
                         Text(slot.hotKey.displayString)
                             .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                            .padding(.vertical, 3)
+                            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
                 .padding(.horizontal, 12)
@@ -196,9 +230,14 @@ private struct SlotCardView: View {
                     }
 
                     if let conflict = hotkeyConflict {
-                        Text("Conflicts with \"\(conflict)\"")
-                            .foregroundStyle(.red)
-                            .font(.caption)
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                            Text("Conflicts with \"\(conflict)\"")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.red)
+                        .padding(.leading, 74)
                     }
 
                     Toggle("Auto-detect working directory", isOn: $slot.useProjectDirectory)
@@ -211,7 +250,7 @@ private struct SlotCardView: View {
                     LabeledField("Window") {
                         HStack(spacing: 12) {
                             HStack(spacing: 4) {
-                                Text("W").foregroundStyle(.secondary)
+                                Text("W").foregroundStyle(.secondary).font(.caption)
                                 TextField("", value: $slot.windowSize.width, format: .number)
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 60)
@@ -219,7 +258,7 @@ private struct SlotCardView: View {
                                     .onSubmit { onChanged() }
                             }
                             HStack(spacing: 4) {
-                                Text("H").foregroundStyle(.secondary)
+                                Text("H").foregroundStyle(.secondary).font(.caption)
                                 TextField("", value: $slot.windowSize.height, format: .number)
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 60)
@@ -231,20 +270,27 @@ private struct SlotCardView: View {
 
                     HStack {
                         Spacer()
-                        Button("Delete", role: .destructive) {
+                        Button(role: .destructive) {
                             onDelete()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                                .font(.caption)
                         }
+                        .buttonStyle(.borderless)
                     }
                 }
                 .padding(12)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.separator, lineWidth: 1)
-        )
+        .settingsCard()
+        .shadow(color: .black.opacity(isHovering && !isExpanded ? 0.06 : 0.02),
+                radius: isHovering && !isExpanded ? 4 : 1, y: 1)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
     }
 }
 
@@ -271,7 +317,6 @@ private struct LabeledField<Content: View>: View {
 
 // MARK: - Directory picker field
 
-/// A monospaced text field with a folder button that opens NSOpenPanel.
 private struct DirectoryPickerField: View {
     @Binding var path: String
 
@@ -285,7 +330,7 @@ private struct DirectoryPickerField: View {
                 Image(systemName: "folder")
             }
             .buttonStyle(.borderless)
-            .help("Choose directory…")
+            .help("Choose directory...")
         }
     }
 
@@ -312,24 +357,28 @@ private struct PermissionsSection: View {
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Permissions")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel("Permissions", icon: "lock.shield")
 
-            PermissionRowView(
-                granted: accessibilityGranted,
-                name: "Accessibility",
-                description: "Detect working directory from frontmost app window.",
-                settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-            )
+            VStack(spacing: 0) {
+                PermissionRowView(
+                    granted: accessibilityGranted,
+                    name: "Accessibility",
+                    description: "Detect working directory from frontmost app window.",
+                    settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+                )
 
-            PermissionRowView(
-                granted: nil,
-                name: "Automation (Finder)",
-                description: "macOS will prompt when needed.",
-                settingsURL: nil
-            )
+                Divider()
+                    .padding(.leading, 36)
+
+                PermissionRowView(
+                    granted: nil,
+                    name: "Automation (Finder)",
+                    description: "macOS will prompt when needed.",
+                    settingsURL: nil
+                )
+            }
+            .settingsCard()
         }
         .onReceive(timer) { _ in
             accessibilityGranted = AXIsProcessTrusted()
@@ -368,12 +417,7 @@ private struct PermissionRowView: View {
                 .controlSize(.small)
             }
         }
-        .padding(8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(.separator, lineWidth: 1)
-        )
+        .padding(10)
     }
 
     @ViewBuilder

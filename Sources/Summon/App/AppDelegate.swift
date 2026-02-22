@@ -86,7 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let view = SettingsView()
                 .environmentObject(sessionManager)
-                .frame(width: 480, height: 500)
+                .frame(width: 500, height: 600)
             let hostingController = NSHostingController(rootView: view)
             hostingController.sizingOptions = []
             let window = NSWindow(contentViewController: hostingController)
