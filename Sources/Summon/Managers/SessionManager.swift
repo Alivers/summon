@@ -32,6 +32,12 @@ class SessionManager: ObservableObject {
             var launchConfig = slot
             launchConfig.workingDirectory = WorkingDirectoryDetector.resolve(for: slot)
             let session = TerminalSession(config: launchConfig)
+            // When the session ends (process exit OR user closes window),
+            // remove it so the next hotkey press creates a fresh session
+            // and runs resolve() again to pick up the new working directory.
+            session.onSessionTerminated = { [weak self] in
+                self?.sessions[slotID] = nil
+            }
             sessions[slotID] = session
             session.launch()
         }
